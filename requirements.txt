@@ -6,3 +6,4 @@ pygame
 numpy
 torch
 moviepy
+gym-sf
