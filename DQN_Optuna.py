@@ -8,10 +8,13 @@ from torch.optim import AdamW
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import EarlyStopping
 
+
 import gymnasium as gym
 from gymnasium.wrappers import RecordVideo, RecordEpisodeStatistics, TimeLimit
 
 import optuna
+from optuna.integration import PyTorchLightningPruningCallback
+
 import random
 import numpy as np
 from collections import deque
@@ -97,7 +100,7 @@ def epsilon_greedy(state, env, net, epsilon=0.0):
 def create_environment(name, render_mode):
     env = gym.make(name, render_mode=render_mode)
     env = TimeLimit(env, max_episode_steps=400)
-    env = RecordVideo(env, video_folder='./videos', episode_trigger=lambda x: x % 1000 == 0)
+    env = RecordVideo(env, video_folder='./videos', episode_trigger=lambda x: x % 1_000 == 0)
     env = RecordEpisodeStatistics(env)
     return env
 
@@ -200,13 +203,57 @@ class DeepQLearning(LightningModule):
             self.target_q_net.load_state_dict(self.q_net.state_dict())
 
 
+def objective(trial):
+    lr = trial.suggest_float('lr', 1e-5, 1e-1, log=True)
+    gamma = trial.suggest_float('gamma', 0.0, 1.0)
+    hidden_size = trial.suggest_categorical('hidden_size', [32, 64, 128, 256])
+    eps_end = trial.suggest_float('eps_end', 0.0, 0.3)
+    sync_rate = trial.suggest_int('sync_rate', 10, 100, log=True)
+
+
+    algo = DeepQLearning('LunarLander-v2',
+                         render_mode='rgb_array_list',
+                         lr=lr,
+                         gamma=gamma,
+                         hidden_size=hidden_size,
+                         eps_end=eps_end,
+                         sync_rate=sync_rate)
+
+    callback = PyTorchLightningPruningCallback(trial, monitor='hp_metric')
+
+    trainer = Trainer(
+        gpus=num_gpus,
+        max_epochs=400,
+        callbacks=[callback]
+    )
+
+    hyperparameters = dict(lr=lr,
+                           gamma=gamma,
+                           hidden_size=hidden_size,
+                           eps_end=eps_end,
+                           sync_rate=sync_rate)
+
+
+    trainer.logger.log_hyperparams(hyperparameters)
+    trainer.fit(algo)
+
+    return trainer.callback_metrics['hp_metric'].item()
+
+
+pruner = optuna.pruners.SuccessiveHalvingPruner()
+study = optuna.create_study(direction='maximize', pruner=pruner)
+
+study.optimize(objective, n_trials=5)
+
+print(study.best_params)
+
 
 # Train the policy
-algo = DeepQLearning('LunarLander-v2', render_mode='rgb_array_list')
+algo = DeepQLearning('LunarLander-v2', render_mode='rgb_array_list', **study.best_params)
 
 trainer = Trainer(
     gpus=num_gpus,
-    max_epochs=10_000,
+    max_epochs=1_000,
     callbacks=[EarlyStopping(monitor='episode/Return', mode='max', patience=1_000)]
 )
 
