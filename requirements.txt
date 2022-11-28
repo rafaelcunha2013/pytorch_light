@@ -1,4 +1,5 @@
-gym==0.22
-gym[box2d]
+gymnasium[box2d]
 pytorch-lightning==1.6.0
 pyvirtualdisplay
+optuna
+pygame
