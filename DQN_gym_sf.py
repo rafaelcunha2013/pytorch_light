@@ -227,7 +227,7 @@ def objective(trial):
 
     trainer = Trainer(
         gpus=num_gpus,
-        max_epochs=2_000_000,
+        max_epochs=4_000_000,
         callbacks=[callback]
     )
 
