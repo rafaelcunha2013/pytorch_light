@@ -247,7 +247,7 @@ def objective(trial):
 pruner = optuna.pruners.SuccessiveHalvingPruner()
 study = optuna.create_study(direction='maximize', pruner=pruner)
 
-study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=20)
 
 print(study.best_params)
 
