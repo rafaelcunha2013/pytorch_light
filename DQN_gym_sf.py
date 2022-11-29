@@ -101,8 +101,8 @@ def epsilon_greedy(state, env, net, epsilon=0.0):
     return action
 
 
-def create_environment(name, render_mode):
-    env = gym.make(name, render_mode=render_mode)
+def create_environment(name, render_mode, video=False):
+    env = gym.make(name, render_mode=render_mode, video=video)
     env = TimeLimit(env, max_episode_steps=500)
     # env = RecordVideo(env, video_folder='./videos', episode_trigger=lambda x: x % 1_000 == 0)
     env = RecordEpisodeStatistics(env)
@@ -110,12 +110,12 @@ def create_environment(name, render_mode):
 
 
 class DeepQLearning(LightningModule):
-    def __init__(self, env_name, render_mode=None, policy=epsilon_greedy, capacity=100_000, batch_size=254,
+    def __init__(self, env_name, render_mode=None, video=False, policy=epsilon_greedy, capacity=100_000, batch_size=254,
                  lr=1e-3, hidden_size=128, gamma=0.99, loss_fn=F.smooth_l1_loss, optim=AdamW,
                  eps_start=1.0, eps_end=0.15, eps_last_episode=100, samples_per_epoch=1_000,
                  sync_rate=10):
         super().__init__()
-        self.env = create_environment(env_name, render_mode)
+        self.env = create_environment(env_name, render_mode, video=video)
 
         # Create training and target network
         hidden_dim = hidden_size
@@ -253,7 +253,7 @@ print(study.best_params)
 
 
 # Train the policy
-algo = DeepQLearning('four-room-v0', render_mode='rgb_array_list', **study.best_params)
+algo = DeepQLearning('four-room-v0', render_mode='rgb_array', **study.best_params)
 
 trainer = Trainer(
     gpus=num_gpus,
